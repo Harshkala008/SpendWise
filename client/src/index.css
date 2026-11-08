@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+	font-family: 'Inter', sans-serif;
+	color: var(--sw-text);
+	background: var(--sw-page);
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	--sw-page: #f5f6fb;
+	--sw-surface: rgba(255, 255, 255, .76);
+	--sw-text: #17152b;
+	--sw-muted: #6f7185;
+	--sw-line: rgba(40, 38, 76, .12);
+	--sw-primary: #635bff;
+	--sw-income: #16b887;
+	--sw-expense: #f05d76;
+	--sw-warning: #f4ad3d;
+}
+
+:root.dark {
+	--sw-page: #0d0b1d;
+	--sw-surface: rgba(25, 22, 51, .72);
+	--sw-text: #f6f4ff;
+	--sw-muted: #a3a1bc;
+	--sw-line: rgba(220, 216, 255, .13);
+	--sw-primary: #8c83ff;
+}
+
+* { box-sizing: border-box; }
+body { min-width: 320px; margin: 0; color: var(--sw-text); background: var(--sw-page); transition: color .25s ease, background .25s ease; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }

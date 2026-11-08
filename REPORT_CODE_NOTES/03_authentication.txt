@@ -1,0 +1,143 @@
+FILE: controllers/authController.js
+COMPONENT: Signup and login
+
+DESCRIPTION:
+Authentication uses bcrypt for password hashing and JSON Web Tokens for
+session access. The short-lived access token is returned to the frontend.
+The long-lived refresh token is stored in an HTTP-only cookie and only its
+SHA-256 hash is stored in MongoDB.
+
+MAIN CODE EXCERPT:
+
+const issueTokens = async (user, response) => {
+  const accessToken = createAccessToken(user._id.toString());
+  const refreshToken = createRefreshToken(user._id.toString());
+
+  await User.findByIdAndUpdate(user._id, {
+    refreshTokenHash: hashToken(refreshToken)
+  });
+
+  response.cookie('spendwise_refresh', refreshToken, cookieOptions);
+  return {
+    accessToken,
+    user: { id: user._id, email: user.email }
+  };
+};
+
+const login = asyncHandler(async (request, response) => {
+  const email = request.body.email.trim().toLowerCase();
+  const user = await User.findOne({ email }).select('+passwordHash');
+
+  if (!user || !(await bcrypt.compare(request.body.password, user.passwordHash))) {
+    throw new AppError('Invalid email or password', 401, 'AUTH_INVALID');
+  }
+
+  response.json({
+    success: true,
+    data: await issueTokens(user, response)
+  });
+});
+
+PSEUDOCODE:
+
+LOGIN:
+  receive email and password
+  normalize email
+  find user and explicitly load password hash
+  compare submitted password with bcrypt hash
+  IF comparison fails
+    return authentication error
+  END IF
+  create 15-minute access token
+  create 7-day refresh token
+  hash refresh token and save only the hash
+  place raw refresh token in HTTP-only cookie
+  return access token and safe user details
+END LOGIN
+
+
+FILE: utils/auth.js
+COMPONENT: Token creation and token hashing
+
+MAIN CODE EXCERPT:
+
+const createAccessToken = (userId) =>
+  jwt.sign(
+    { sub: userId, type: 'access' },
+    requireSecret(accessSecret(), 'JWT_ACCESS_SECRET'),
+    { expiresIn: '15m' }
+  );
+
+const createRefreshToken = (userId) =>
+  jwt.sign(
+    { sub: userId, type: 'refresh' },
+    requireSecret(refreshSecret(), 'JWT_REFRESH_SECRET'),
+    { expiresIn: '7d' }
+  );
+
+const hashToken = (token) =>
+  crypto.createHash('sha256').update(token).digest('hex');
+
+PSEUDOCODE:
+
+ACCESS TOKEN:
+  put user id and access token type in JWT
+  sign with access secret
+  expire after 15 minutes
+
+REFRESH TOKEN:
+  put user id and refresh token type in JWT
+  sign with refresh secret
+  expire after 7 days
+
+REFRESH TOKEN STORAGE:
+  hash raw token with SHA-256
+  store hash instead of raw token
+END
+
+
+FILE: middleware/auth.js
+COMPONENT: Protected route authentication
+
+MAIN CODE EXCERPT:
+
+const requireAuth = (request, response, next) => {
+  const header = request.get('authorization');
+  const token = header?.startsWith('Bearer ')
+    ? header.slice(7)
+    : null;
+
+  if (!token) {
+    return next(new AppError(
+      'Authentication required',
+      401,
+      'AUTH_REQUIRED'
+    ));
+  }
+
+  try {
+    const payload = jwt.verify(token, accessSecret());
+    if (payload.type !== 'access') throw new Error('Invalid token type');
+    request.user = { id: payload.sub };
+    return next();
+  } catch {
+    return next(new AppError(
+      'Invalid or expired access token',
+      401,
+      'AUTH_INVALID'
+    ));
+  }
+};
+
+PSEUDOCODE:
+
+read Bearer token from Authorization header
+IF token is missing
+  reject request with 401
+END IF
+verify token signature and expiry
+IF token type is not access
+  reject request
+END IF
+put authenticated user id on request
+continue to protected controller

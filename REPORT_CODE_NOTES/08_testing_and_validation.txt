@@ -1,0 +1,73 @@
+FILE: tests/expense.test.js
+COMPONENT: Backend API smoke tests
+
+DESCRIPTION:
+The tests use Supertest to call the Express application directly. They check
+the health endpoint, standard 404 behavior, and authentication protection for
+expense endpoints.
+
+MAIN CODE EXCERPT:
+
+const request = require('supertest');
+const app = require('../app');
+
+test('GET /api/health returns a healthy response', async () => {
+  const response = await request(app).get('/api/health');
+
+  expect(response.statusCode).toBe(200);
+  expect(response.body.success).toBe(true);
+  expect(response.body.data.environment).toBeDefined();
+});
+
+test('expense routes require authentication', async () => {
+  const response = await request(app)
+    .post('/api/expenses')
+    .send({ title: 'A', amount: 0, category: 'Invalid' });
+
+  expect(response.statusCode).toBe(401);
+  expect(response.body.success).toBe(false);
+  expect(response.body.error.code).toBe('AUTH_REQUIRED');
+});
+
+PSEUDOCODE:
+
+load Express app without opening a listening port
+send request to health endpoint
+verify successful status and response structure
+send request to an unknown endpoint
+verify standard 404 response
+send protected expense request without token
+verify request is rejected with authentication error
+
+
+VALIDATION COMMANDS USED:
+
+Backend tests:
+  npm test
+
+Frontend production build:
+  cd client
+  npm run build
+
+Frontend lint:
+  cd client
+  npm run lint
+
+Runtime checks:
+  Backend: GET http://localhost:5000/api/health
+  Frontend: GET http://localhost:5173/
+
+VALIDATION RESULT:
+
+The backend tests passed.
+The frontend production build passed.
+The frontend lint command completed with warnings but no lint errors.
+The running backend health endpoint returned HTTP 200.
+The running frontend returned HTTP 200.
+
+The lint warnings are:
+1. ThemeContext exports a hook alongside a provider component.
+2. App.jsx sets state inside an effect.
+3. App.jsx has effect dependency warnings.
+
+These are maintainability warnings, not build failures.

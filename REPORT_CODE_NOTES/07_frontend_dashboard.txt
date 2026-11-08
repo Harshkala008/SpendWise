@@ -1,0 +1,173 @@
+FILE: client/src/App.jsx
+COMPONENT: Dashboard state and data loading
+
+DESCRIPTION:
+App.jsx is the main authenticated dashboard. It controls login state, expense
+form state, filters, monthly summary data, settings, notifications, and
+navigation between dashboard sections.
+
+MAIN CODE EXCERPT: DASHBOARD STATE
+
+const [authenticated, setAuthenticated] = useState(false);
+const [form, setForm] = useState(makeEmptyForm);
+const [expenses, setExpenses] = useState([]);
+const [filters, setFilters] = useState({
+  category: '',
+  paymentMethod: '',
+  startDate: '',
+  endDate: ''
+});
+const [summary, setSummary] = useState({
+  totalSpent: 0,
+  expenseCount: 0,
+  breakdown: []
+});
+const [loading, setLoading] = useState(true);
+const [saving, setSaving] = useState(false);
+const [notice, setNotice] = useState(null);
+
+PSEUDOCODE:
+
+maintain authentication status
+maintain form values
+maintain expense list and filters
+maintain monthly totals and category breakdown
+maintain loading and saving indicators
+maintain success/error notification
+render login page when unauthenticated
+render dashboard when authenticated
+
+
+MAIN CODE EXCERPT: LOAD EXPENSES AND SUMMARY
+
+const loadExpenses = async () => {
+  const { data } = await api.get('/expenses', {
+    params: {
+      ...filters,
+      startDate: historyDate || filters.startDate,
+      endDate: historyDate || filters.endDate
+    }
+  });
+  setExpenses(data.data.expenses);
+  setPagination(data.data.pagination);
+};
+
+const loadSummary = async () => {
+  const [year, month] = historyMonth.split('-');
+  const { data } = await api.get('/expenses/summary', {
+    params: { month, year }
+  });
+  setSummary(data.data);
+};
+
+PSEUDOCODE:
+
+when user or selected period changes:
+  request filtered expenses
+  store returned expenses and pagination
+  request monthly summary
+  store total, count, and category breakdown
+  show loading or error notice as required
+
+
+MAIN CODE EXCERPT: CREATE EXPENSE
+
+const submitExpense = async (event) => {
+  event.preventDefault();
+  setSaving(true);
+  try {
+    const payload = {
+      ...form,
+      category: form.category === 'Other'
+        ? form.categoryName.trim() || 'Other'
+        : form.category
+    };
+    delete payload.categoryName;
+    await api.post('/expenses', payload);
+    setForm(makeEmptyForm());
+    setNotice({ type: 'success', text: 'Expense added.' });
+    await Promise.all([loadExpenses(), loadSummary()]);
+  } catch (requestError) {
+    setNotice({ type: 'error', text: getApiError(requestError) });
+  } finally {
+    setSaving(false);
+  }
+};
+
+PSEUDOCODE:
+
+prevent normal form submission
+show saving state
+convert custom "Other" category into a category value
+remove frontend-only category field
+send expense to API
+reset form after success
+reload list and monthly summary
+show error if API call fails
+hide saving state
+
+
+FILE: client/src/App.jsx
+COMPONENT: Spending chart and category chart
+
+DESCRIPTION:
+The dashboard uses SVG components to visualize the returned summary. The
+spending chart shows the monthly total and the pie chart converts category
+totals into proportional slices.
+
+MAIN CODE EXCERPT:
+
+const items = breakdown.slice(0, 5);
+const total = items.reduce((sum, item) => sum + item.total, 0);
+
+const slices = items.reduce((result, item, index) => {
+  const start = result.at(-1)?.end || 0;
+  const end = start + (total ? item.total / total * 360 : 0);
+  return [...result, { item, index, start, end }];
+}, []);
+
+PSEUDOCODE:
+
+take the top five category totals
+calculate sum of displayed categories
+for each category:
+  calculate percentage of total
+  convert percentage to start/end angles
+  draw SVG arc using category color
+when user hovers:
+  show category amount and percentage
+END
+
+
+FILE: client/src/App.jsx
+COMPONENT: Custom settings
+
+MAIN CODE EXCERPT:
+
+const updateSetting = (key, value) => {
+  const next = { ...settings, [key]: value };
+  setSettings(next);
+
+  if (key === 'currency') {
+    localStorage.setItem('spendwise-currency', value);
+  }
+  if (key === 'customCategories') {
+    localStorage.setItem(
+      'spendwise-custom-categories',
+      JSON.stringify(value)
+    );
+  }
+  setNotice({ type: 'success', text: 'Settings saved.' });
+};
+
+PSEUDOCODE:
+
+receive changed setting
+merge it into current settings
+update React state
+persist setting in local storage
+show saved notification
+for custom options:
+  reject blank, duplicate, or excessive values
+  allow rename and delete
+END

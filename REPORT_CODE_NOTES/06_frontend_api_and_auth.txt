@@ -1,0 +1,146 @@
+FILE: client/src/main.jsx
+COMPONENT: React application entry point
+
+MAIN CODE EXCERPT:
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  </StrictMode>
+);
+
+DESCRIPTION:
+The root element receives the React application. StrictMode helps detect
+development problems, while ThemeProvider makes theme state available to all
+components.
+
+
+FILE: client/src/api.js
+COMPONENT: Axios API client and access-token refresh
+
+MAIN CODE EXCERPT:
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  withCredentials: true
+});
+
+let accessToken = null;
+let refreshPromise = null;
+
+export const setAccessToken = (token) => {
+  accessToken = token;
+};
+
+api.interceptors.request.use((config) => {
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(undefined, async (error) => {
+  const original = error.config;
+  if (
+    error.response?.status !== 401 ||
+    original?._retry ||
+    original?.url?.includes('/auth/')
+  ) {
+    throw error;
+  }
+
+  original._retry = true;
+  refreshPromise ||= api.post('/auth/refresh')
+    .then(({ data }) => {
+      setAccessToken(data.data.accessToken);
+      return data.data.accessToken;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  await refreshPromise;
+  return api(original);
+});
+
+PSEUDOCODE:
+
+create Axios client with backend URL and cookies enabled
+store access token in memory
+attach Bearer token to outgoing requests
+when a request returns 401:
+  do not retry auth endpoints
+  do not retry the same request twice
+  call refresh endpoint using HTTP-only cookie
+  save new access token
+  retry original request
+if refresh fails, show authentication error to UI
+
+
+FILE: client/src/components/LoginPage.jsx
+COMPONENT: Login and signup user interface
+
+MAIN CODE EXCERPT:
+
+const submit = async (event) => {
+  event.preventDefault();
+
+  if (!email.trim() || !password.trim()) {
+    setError('Enter your login ID and password to continue.');
+    return;
+  }
+
+  setBusy(true);
+  try {
+    const { data } = await api.post(
+      `/auth/${signup ? 'signup' : 'login'}`,
+      { email: email.trim(), password }
+    );
+    onLogin(data.data.accessToken);
+  } catch (requestError) {
+    setError(getAuthError(requestError));
+  } finally {
+    setBusy(false);
+  }
+};
+
+PSEUDOCODE:
+
+when login form is submitted:
+  stop browser's default form submission
+  check that email and password are present
+  show loading state
+  call signup or login endpoint
+  pass returned access token to parent application
+  show useful error if request fails
+  remove loading state
+
+
+FILE: client/src/context/ThemeContext.jsx
+COMPONENT: Light/dark theme state
+
+MAIN CODE EXCERPT:
+
+const getInitialTheme = () => {
+  const savedTheme = localStorage.getItem('spendwise-theme');
+  if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+  return window.matchMedia('(prefers-color-scheme: light)').matches
+    ? 'light'
+    : 'dark';
+};
+
+useEffect(() => {
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('spendwise-theme', theme);
+}, [theme]);
+
+PSEUDOCODE:
+
+read saved theme
+if no saved value, use operating-system preference
+apply theme class and data attribute to HTML element
+save changes in local storage
+provide theme and toggle function to child components

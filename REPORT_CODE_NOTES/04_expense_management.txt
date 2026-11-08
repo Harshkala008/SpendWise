@@ -1,0 +1,133 @@
+FILE: controllers/expenseController.js
+COMPONENT: Expense CRUD and monthly summary
+
+DESCRIPTION:
+The expense controller contains the main business logic for creating,
+reading, updating, deleting, filtering, paginating, and summarizing expenses.
+Every database query includes the authenticated user id so users can only
+access their own records.
+
+MAIN CODE EXCERPT: MONEY CONVERSION AND CREATE
+
+const toPaise = (amount) => {
+  const parsed = Number(amount);
+  if (!Number.isFinite(parsed)) return NaN;
+  return Math.round(parsed * 100);
+};
+
+const createExpense = asyncHandler(async (request, response) => {
+  const { amount, ...data } = request.body;
+  const expense = await Expense.create({
+    ...data,
+    amountPaise: toPaise(amount),
+    userId: request.user.id
+  });
+
+  response.status(201).json({
+    success: true,
+    message: 'Expense created successfully',
+    data: expense
+  });
+});
+
+PSEUDOCODE:
+
+receive expense form data
+separate normal fields from amount
+convert amount to integer paise/cents
+attach current authenticated user id
+save expense in MongoDB
+return created expense
+
+
+MAIN CODE EXCERPT: FILTERING AND PAGINATION
+
+const page = Math.max(
+  Number.parseInt(request.query.page, 10) || 1,
+  1
+);
+const limit = Math.min(
+  Math.max(Number.parseInt(request.query.limit, 10) || 10, 1),
+  100
+);
+
+const filter = { userId: request.user.id };
+if (category) filter.category = category;
+if (paymentMethod) filter.paymentMethod = paymentMethod;
+
+const [expenses, totalItems] = await Promise.all([
+  Expense.find(filter).sort(sort).skip(skip).limit(limit),
+  Expense.countDocuments(filter)
+]);
+
+response.json({
+  success: true,
+  data: {
+    expenses,
+    pagination: {
+      page,
+      limit,
+      totalItems,
+      totalPages: Math.ceil(totalItems / limit)
+    }
+  }
+});
+
+PSEUDOCODE:
+
+read filters and page parameters
+force page to be at least 1
+limit results to a maximum of 100
+start database filter with current user id
+add category, payment, and date filters if supplied
+accept only approved sort fields
+query matching records and count them in parallel
+return records plus pagination metadata
+
+
+MAIN CODE EXCERPT: MONTHLY CATEGORY SUMMARY
+
+const breakdown = await Expense.aggregate([
+  {
+    $match: {
+      userId: new mongoose.Types.ObjectId(request.user.id),
+      date: { $gte: startDate, $lt: endDate }
+    }
+  },
+  {
+    $group: {
+      _id: '$category',
+      totalPaise: { $sum: '$amountPaise' },
+      count: { $sum: 1 }
+    }
+  },
+  { $sort: { totalPaise: -1 } }
+]);
+
+const totalSpent =
+  breakdown.reduce((sum, item) => sum + item.totalPaise, 0) / 100;
+
+PSEUDOCODE:
+
+validate month and year
+create start and end dates for the selected month
+find only current user's expenses within that period
+group expenses by category
+sum stored paise/cents and count records
+sort categories from highest spending to lowest
+convert totals back to normal currency for response
+return total, count, and category breakdown
+
+
+UPDATE AND DELETE RULE:
+
+For update and delete operations, the controller uses:
+
+Expense.findOneAndUpdate(
+  { _id: request.params.id, userId: request.user.id },
+  update,
+  { new: true, runValidators: true }
+);
+
+This combined id-and-owner filter prevents one user from modifying another
+user's expense.

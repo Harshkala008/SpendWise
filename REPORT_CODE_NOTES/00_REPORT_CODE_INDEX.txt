@@ -1,0 +1,49 @@
+SPENDWISE - REPORT CODE NOTES
+================================
+
+Purpose:
+This folder contains report-ready explanations of the main implementation
+components. The files intentionally show the important code patterns rather
+than reproducing every line of the application.
+
+Files:
+
+01_backend_server_and_app.txt
+    Express application setup, middleware pipeline, health endpoint, and
+    server startup with MongoDB connection checks.
+
+02_database_models.txt
+    Mongoose User and Expense schemas, validation, indexes, and money storage.
+
+03_authentication.txt
+    Signup, login, JWT access tokens, refresh-token rotation, logout, and
+    authentication middleware.
+
+04_expense_management.txt
+    Expense creation, filtering, pagination, update/delete operations, and
+    monthly category summaries.
+
+05_api_routes_and_middleware.txt
+    Route definitions, request validation, sanitization, errors, and security
+    middleware.
+
+06_frontend_api_and_auth.txt
+    React entry point, Axios API client, token handling, automatic refresh,
+    login/signup workflow, and theme management.
+
+07_frontend_dashboard.txt
+    Main dashboard state, loading data, submitting expenses, charts, and
+    settings/customization logic.
+
+08_testing_and_validation.txt
+    Backend smoke tests and the build/lint checks used to validate the system.
+
+How to use in a report:
+1. Copy the short description for the relevant module.
+2. Copy only the code excerpt needed for the section.
+3. Use the pseudocode to explain the algorithm in simple words.
+4. Cite the original source filename shown above each excerpt.
+
+Security note:
+No passwords, database URLs, JWT secrets, or local environment values are
+included in these notes.

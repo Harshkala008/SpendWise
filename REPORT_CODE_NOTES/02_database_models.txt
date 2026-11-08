@@ -1,0 +1,102 @@
+FILE: models/User.js
+COMPONENT: User data model
+
+DESCRIPTION:
+The User model stores login identity and hashed authentication data. The
+password and refresh-token hash are hidden by default using select: false.
+
+MAIN CODE EXCERPT:
+
+const userSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true
+    },
+    passwordHash: {
+      type: String,
+      required: true,
+      select: false
+    },
+    refreshTokenHash: {
+      type: String,
+      select: false
+    }
+  },
+  { timestamps: true }
+);
+
+PSEUDOCODE:
+
+WHEN creating a user:
+  require an email
+  normalize email to lowercase and remove extra spaces
+  require a password hash
+  enforce unique email
+  store created and updated timestamps
+  hide password hash from normal queries
+END
+
+
+FILE: models/Expense.js
+COMPONENT: Expense data model
+
+DESCRIPTION:
+The Expense model stores each expense for one owner. Currency is stored as
+whole paise/cents in amountPaise to avoid floating-point rounding problems.
+The virtual amount field converts it back to normal currency for API output.
+
+MAIN CODE EXCERPT:
+
+const expenseSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true
+    },
+    title: {
+      type: String,
+      required: [true, 'Title is required'],
+      trim: true,
+      minlength: [2, 'Title must be at least 2 characters'],
+      maxlength: [100, 'Title cannot exceed 100 characters']
+    },
+    amountPaise: {
+      type: Number,
+      required: true,
+      min: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: 'Amount must be stored as whole paise'
+      }
+    },
+    category: { type: String, required: true, trim: true },
+    paymentMethod: { type: String, default: 'UPI' },
+    date: { type: Date, default: Date.now },
+    notes: { type: String, maxlength: 500 }
+  },
+  { timestamps: true, toJSON: { virtuals: true } }
+);
+
+expenseSchema.virtual('amount').get(function getAmount() {
+  return this.amountPaise / 100;
+});
+
+expenseSchema.index({ userId: 1, date: -1 });
+
+PSEUDOCODE:
+
+WHEN an expense is saved:
+  associate it with the authenticated user
+  validate title, amount, category, and optional fields
+  store amount as an integer number of paise/cents
+  store date and payment details
+  provide a calculated amount value for API responses
+  use indexes for owner/date and category searches
+END

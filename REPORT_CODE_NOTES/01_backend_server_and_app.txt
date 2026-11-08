@@ -1,0 +1,124 @@
+FILE: app.js
+COMPONENT: Express application configuration
+
+DESCRIPTION:
+This file creates the Express application and defines the common request
+pipeline. It enables security headers, CORS, cookies, JSON parsing, request
+sanitization, logging, API routes, and central error handling.
+
+MAIN CODE EXCERPT:
+
+const app = express();
+
+app.use(helmet());
+
+const allowedOrigins = (process.env.FRONTEND_ORIGIN ||
+  'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim());
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use((request, response, next) => {
+  for (const source of [request.body, request.query, request.params]) {
+    if (!source || typeof source !== 'object') continue;
+    for (const key of Object.keys(source)) {
+      source[key] = mongoSanitize.sanitize(source[key]);
+    }
+  }
+  next();
+});
+
+app.get('/api/health', (request, response) => {
+  response.status(200).json({
+    success: true,
+    message: 'Expense API is running',
+    data: { environment: process.env.NODE_ENV || 'development' }
+  });
+});
+
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/auth', authRoutes);
+app.use(notFound);
+app.use(errorHandler);
+
+module.exports = app;
+
+PSEUDOCODE:
+
+START
+  create Express application
+  enable secure HTTP headers
+  allow requests from configured frontend origins
+  enable cookies and JSON/form request parsing
+  sanitize body, query, and route parameters
+  log incoming requests
+  register health endpoint
+  register authentication routes
+  register expense routes
+  send standard response for unknown routes
+  send standard response for unhandled errors
+  export application for server and tests
+END
+
+
+FILE: server.js
+COMPONENT: Server startup and database availability
+
+DESCRIPTION:
+This file is the executable entry point. It checks required environment
+variables, retries MongoDB connections, prepares the admin account, and only
+then starts listening for HTTP requests.
+
+MAIN CODE EXCERPT:
+
+const requiredEnv = [
+  'MONGODB_URI',
+  'JWT_ACCESS_SECRET',
+  'JWT_REFRESH_SECRET'
+];
+
+const missingEnv = requiredEnv.filter((name) => !process.env[name]);
+if (missingEnv.length) {
+  throw new Error(
+    `Missing required environment variables: ${missingEnv.join(', ')}`
+  );
+}
+
+for (let attempt = 1; attempt <= 3 && !connected; attempt += 1) {
+  try {
+    await connectDB();
+    connected = true;
+  } catch (error) {
+    console.error(
+      `MongoDB connection attempt ${attempt}/3 failed: ${error.message}`
+    );
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+
+await ensureAdminUser();
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
+PSEUDOCODE:
+
+START SERVER
+  load application
+  check database URL and JWT secrets
+  IF a required value is missing
+    report configuration error
+    stop server
+  END IF
+  TRY to connect to MongoDB up to three times
+  IF all attempts fail
+    report database unavailable
+    stop server
+  END IF
+  create or update development admin account
+  start HTTP server on configured port
+END SERVER
