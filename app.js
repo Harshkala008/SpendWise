@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -38,6 +39,15 @@ app.get('/api/health', (request, response) => {
 
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/auth', authRoutes);
+
+if (process.env.NODE_ENV === 'production') {
+  const clientDistPath = path.join(__dirname, 'client', 'dist');
+  app.use(express.static(clientDistPath));
+  app.get('/{*splat}', (request, response, next) => {
+    if (request.path.startsWith('/api/')) return next();
+    response.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 app.use(notFound);
 app.use(errorHandler);

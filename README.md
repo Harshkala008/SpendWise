@@ -11,6 +11,19 @@ A REST API for managing personal expenses with Express, MongoDB, and Mongoose.
 
 The API runs on `http://localhost:5000` by default.
 
+## Deploy as one public link with Render
+
+1. Create or select a MongoDB Atlas database and allow connections from Render. For a quick student demo, Atlas can temporarily allow `0.0.0.0/0`; use a strong database password and restrict access later.
+2. In Render, choose **New > Blueprint** and select this GitHub repository. Render will use [`render.yaml`](./render.yaml) to build and start the full application.
+3. In the Render service environment settings, add:
+   - `MONGODB_URI`: your Atlas connection string
+   - `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`: two different random strings
+   - `ADMIN_LOGIN_ID` and `ADMIN_PASSWORD`: the teacher/demo login you want to share
+   - `FRONTEND_ORIGIN`: the Render URL assigned to the service, such as `https://spendwise.onrender.com`
+4. Open the Render URL after the health check passes. The dashboard and API use the same URL.
+
+The Render free plan may sleep after inactivity, so the first visit can take a minute to wake up. Never put these environment values in GitHub or in the README.
+
 ## Frontend
 
 The React dashboard lives in the `client` folder. Use two terminals:
